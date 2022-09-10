@@ -1,1 +1,9 @@
 # SqlTips
+
+DBCC FREEPROCCACHE -- Do not run in production!
+GO 
+
+DBCC SHOW_STATISTICS
+
+ SET STATISTICS TIME On;
+ SET STATISTICS IO On
