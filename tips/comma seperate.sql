@@ -1,47 +1,23 @@
-SELECT 
-	GETDATE() AS [CreatedOn]
-	, au.[Id] AS [CreatedById] 
-	, a.[PersonId] AS [PersonId]
-	, a.[Details] + ' for property ' + a.[ProprtyCode] + ' planned works starts on ' + a.[StartDate] + ' to ' + a.[EndDate] + ' by ' + a.[Contractor] + ' - ' + a.[ContractorContactNumber] AS [Details]  
-	, GETDATE() AS [EventDate]
-	, (SELECT [Id] FROM [CRM].[dbo].[FlagTypes] WHERE [Name] = 'Planned Works') AS [FlagTypeId]
-	, (SELECT [Id] FROM [CRM].[dbo].[FlagGroups] WHERE [Name] = 'Information') AS [FlagGroupId]
-	, 0 AS [IsDeleted]
-	, a.[Id] AS [SystemRefId]
-	, au.[Id] AS [ModifiedById]
-	, GETDATE() AS [ModifiedOn]
-FROM 
-	ActiveIdentity..AspNetUsers  au
-INNER JOIN(
-SELECT DISTINCT
-    [OriginalValues].[Id],
-	createdby
-    --, [UploadedFileId]
-    , [pt].[PersonId]
-    , S.a.value('(/H/r)[1]', 'VARCHAR(MAX)') AS [ProprtyCode]
-    , S.a.value('(/H/r)[2]', 'VARCHAR(MAX)')  AS [Details]
-    , S.a.value('(/H/r)[3]', 'VARCHAR(MAX)') AS [StartDate]
-    , S.a.value('(/H/r)[4]', 'VARCHAR(MAX)') AS [EndDate]
-    , S.a.value('(/H/r)[5]', 'VARCHAR(MAX)') AS [Contractor]
-    , S.a.value('(/H/r)[6]', 'VARCHAR(MAX)') AS [ContractorContactNumber] 
-FROM
-    (
-    SELECT 
-        [Id]
-        , createdby
-        --[UploadedFileId],
-        , CAST (N'<H><r>' + REPLACE(CurrentDataValues, ',', '</r><r>')  + '</r></H>' AS XML) AS [vals] 
-    FROM 
-        [RMS].[dbo].[UploadedFileRecords]) OriginalValues 
-        CROSS APPLY OriginalValues.[vals].nodes('/H/r') S(a),
-        [CRM].[dbo].[Properties] [prop]
-        INNER JOIN [CRM].[dbo].[Tenancies] [t] ON [prop].[Id] = [t].[PropertyId]
-        INNER JOIN [CRM].[dbo].[PersonTenancies] [pt] ON [t].[Id] = [pt].[TenancyId] 
-    WHERE 
-        [prop].[PropertyCode] IN (CAST(S.a.value('(/H/r)[1]', 'VARCHAR(MAX)') as nvarchar)) AND [pt].[PersonEndDate] IS NULL AND [pt].[IsMainTenant] = 1) a
-	ON au.[Email] = a.[CreatedBy]
-WHERE 
-	[a].[Id] NOT IN (SELECT [SystemRefId] FROM [CRM].[dbo].[PersonFlags] WHERE [SystemRefId] IS NOT NULL)
+  ;WITH SplitData AS
+(
+  SELECT
+    RecordId,
+    CAST('<x>' + REPLACE(CurrentDataValues, ',', '</x><x>') + '</x>' AS XML) AS DataAsXml
+  FROM [dbo].[UploadedFileRecord] where FileId=@FileId
+)
+SELECT
+  RecordId,
+  DataAsXml.value('/x[1]', 'NVARCHAR(MAX)') AS AssetComponentId,
+  DataAsXml.value('/x[2]', 'NVARCHAR(MAX)') AS PropertyCode,
+  DataAsXml.value('/x[3]', 'NVARCHAR(MAX)') AS 'Address',
+  DataAsXml.value('/x[4]', 'NVARCHAR(MAX)') AS PropertyType,
+  DataAsXml.value('/x[5]', 'NVARCHAR(MAX)') AS ComponentGroup,
+  DataAsXml.value('/x[6]', 'NVARCHAR(MAX)') AS ComponentName,
+  DataAsXml.value('/x[7]', 'NVARCHAR(MAX)') AS InstallDate,
+  DataAsXml.value('/x[8]', 'NVARCHAR(MAX)') AS ExpectedLifeInYears,
+  DataAsXml.value('/x[9]', 'NVARCHAR(MAX)') AS ReplacementYear
+into #RecordData
+FROM SplitData;
 	
 
 DECLARE @inputString NVARCHAR(MAX) = '21720,   850101003,   3 Alcester Garth,    FLAT,      Rooms,   Bathroom,          01/03/2014  ,30s';
